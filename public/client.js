@@ -123,6 +123,14 @@ roomInput.addEventListener('keydown', (e) => {
 // 自動入室
 if (initialRoom) joinRoom(initialRoom);
 
+function keepAliveTick() {
+  if (document.visibilityState === 'visible') {
+    fetch('/health', { cache: 'no-store' }).catch(() => {});
+  }
+}
+setInterval(keepAliveTick, 60000);          // 60秒ごと
+document.addEventListener('visibilitychange', keepAliveTick);
+
 // 閲覧専用ならボタンを無効化
 if (viewOnly) {
   [...document.querySelectorAll('button')].forEach(b => b.disabled = true);
