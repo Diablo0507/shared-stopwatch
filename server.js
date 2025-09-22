@@ -2,28 +2,45 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const { Redis } = require('@upstash/redis'); // 追加
 
-// ---- 状態（グローバルに一意。重複宣言を避ける） ----
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
 const roomState = Object.create(null);
 const initial = () => ({ isRunning: false, startAt: null, offsetMs: 0 });
 
 const app = express();
 app.use(express.static('public'));
-
-// 動作確認用
 app.get('/health', (_req, res) => res.send('ok'));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: true, credentials: true } });
 
-io.on('connection', (socket) => {
-  console.log('[socket] connected', socket.id);
+const key = (roomId) => `room:${roomId}`;
 
-  socket.on('join', ({ roomId }) => {
-    console.log('[socket] join', roomId);
+async function loadState(roomId) {
+  try {
+    const data = await redis.get(key(roomId));
+    if (data && typeof data === 'object') return data;
+  } catch {}
+  return null;
+}
+async function saveState(roomId, state) {
+  try { await redis.set(key(roomId), state); } catch {}
+}
+
+io.on('connection', (socket) => {
+  socket.on('join', async ({ roomId }) => {
     if (!roomId) return;
     socket.join(roomId);
-    if (!roomState[roomId]) roomState[roomId] = initial();
+
+    if (!roomState[roomId]) {
+      const fromRedis = await loadState(roomId);
+      roomState[roomId] = fromRedis || initial();
+    }
 
     socket.emit('state', {
       serverNow: Date.now(),
@@ -31,9 +48,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('control', ({ roomId, action, value }) => {
-    console.log('[socket] control', { roomId, action, value });
-    if (!roomId || !roomState[roomId]) return;
+  socket.on('control', async ({ roomId, action, value }) => {
+    if (!roomId) return;
+    if (!roomState[roomId]) roomState[roomId] = initial();
+
     const s = roomState[roomId];
     const now = Date.now();
 
@@ -58,18 +76,16 @@ io.on('connection', (socket) => {
         return;
     }
 
+    await saveState(roomId, roomState[roomId]); // 変更のたび保存
+
     io.to(roomId).emit('state', {
       serverNow: now,
       ...roomState[roomId],
     });
   });
-
-  socket.on('disconnect', () => {
-    console.log('[socket] disconnected', socket.id);
-  });
 });
 
-const PORT = process.env.PORT || 3000; // Renderが注入するPORTを優先
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Shared Stopwatch listening on ${PORT}`);
 });
