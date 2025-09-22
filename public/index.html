@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>共有ストップウォッチ</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>共有ストップウォッチ</h1>
+      <div class="room">
+        <label>Room ID</label>
+        <input id="roomId" type="text" placeholder="例: abc123" />
+        <button id="joinBtn">入室/更新</button>
+      </div>
+      <p class="url-hint" id="shareUrl"></p>
+      <p class="mode-hint" id="modeHint"></p>
+    </header>
+
+    <section class="timer-card">
+      <div class="display" id="display">00:00.000</div>
+
+      <div class="controls" id="controls">
+        <button data-act="start" class="btn primary">Start</button>
+        <button data-act="pause" class="btn">Pause</button>
+        <button data-act="reset" class="btn warn">Reset</button>
+      </div>
+
+      <div class="increments" id="increments">
+        <button data-add="60000" class="btn soft">+1分</button>
+        <button data-add="300000" class="btn soft">+5分</button>
+        <button data-add="10000" class="btn soft">+10秒</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <details>
+        <summary>動作の仕組み（遅延/ズレ対策）</summary>
+        <p>サーバの時刻と状態を基準にし、端末ごとの時計差を補正して表示（clockDiff）します。同じURL（room）にいる全員が同じ時間を見ます。</p>
+        <p>閲覧専用：URLに <code>?view=1</code> を付けるとボタンが無効になります。</p>
+      </details>
+    </footer>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./client.js" type="module"></script>
+</body>
+</html>
